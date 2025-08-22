@@ -243,7 +243,7 @@ def parse_args() -> argparse.Namespace:
 		"--midband",
 		nargs=2,
 		type=float,
-		default=[0.25, 0.75],
+		default=[0.33, 0.66],
 		help="For symmetric mode: the band [a b] (0..1 or 0..100) where changes are fastest; default 0.25 0.75.",
 	)
 	p.add_argument(
