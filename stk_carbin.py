@@ -200,6 +200,25 @@ def generate_chart(
 				arrowprops=dict(arrowstyle="->", color="gray", alpha=0.7),
 			)
 
+	# Shade region where 2000macd is above the upper midband threshold (default 0.66)
+	# Map threshold from [0,1] (or [0,100]) to indicator domain [-100,100]
+	thr_frac = (midband[1] if midband is not None else 0.66)
+	if thr_frac > 1.0:  # accept 0..100 inputs
+		thr_frac = thr_frac / 100.0
+	thr_frac = max(0.0, min(1.0, float(thr_frac)))
+	x_thr = thr_frac * 200.0 - 100.0  # e.g., 0.66 -> 32
+	# Draw a red hatched translucent span to the right of x_thr
+	ax = plt.gca()
+	ax.axvspan(
+		x_thr,
+		100,
+		facecolor=(1.0, 0.0, 0.0, 0.06),
+		edgecolor="red",
+		hatch="///",
+		linewidth=0.0,
+		zorder=0,
+	)
+
 	plt.title("Position vs 2000macd (Exponential-like mapping)")
 	plt.xlabel("2000macd (-100 → 100)")
 	plt.ylabel("Position % (100 → 0)")
@@ -208,8 +227,23 @@ def generate_chart(
 	plt.ylim(0, 100)
 	ax = plt.gca()
 	ax.set_aspect('equal', adjustable='box')
-	# Optional nicer ticks
-	ax.set_xticks([-100, -50, 0, 50, 100])
+	# X ticks every 20, and emphasize the special tick at x=32
+	ticks = list(range(-100, 101, 20))
+	if 32 not in ticks:
+		ticks.append(32)
+	ticks.sort()
+	ax.set_xticks(ticks)
+	# Highlight the 32 tick label
+	for lbl in ax.get_xticklabels():
+		if lbl.get_text() in ("32", "32.0"):
+			lbl.set_color("crimson")
+			lbl.set_fontweight("bold")
+			try:
+				lbl.set_fontsize(lbl.get_fontsize() + 2)
+			except Exception:
+				pass
+	# Draw a short red tick-like line at x=32 above the axis baseline
+	ax.plot([32, 32], [0, 5], color="crimson", linewidth=2.0, zorder=6, solid_capstyle='butt')
 	ax.set_yticks([0, 20, 40, 60, 80, 100])
 	plt.grid(True, alpha=0.3)
 	plt.legend(title="Steepness", loc="upper right")
@@ -244,7 +278,7 @@ def parse_args() -> argparse.Namespace:
 		nargs=2,
 		type=float,
 		default=[0.33, 0.66],
-		help="For symmetric mode: the band [a b] (0..1 or 0..100) where changes are fastest; default 0.25 0.75.",
+		help="For symmetric mode: the band [a b] (0..1 or 0..100) where changes are fastest; default 0.33 0.66.",
 	)
 	p.add_argument(
 		"--out",
