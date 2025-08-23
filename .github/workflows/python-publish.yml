@@ -6,12 +6,9 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: run to get risk
+name: run stk_carbin manually
 
 on:
-  release:
-    types: [published]
-  # Allow manual runs from the Actions -> Run workflow button
   workflow_dispatch:
     inputs:
       k:
@@ -35,67 +32,9 @@ on:
         required: false
         default: 'position_curve.png'
 
-permissions:
-  contents: read
-
 jobs:
-  release-build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-
-      - name: Build release distributions
-        run: |
-          # NOTE: put your own distribution build steps here.
-          python -m pip install build
-          python -m build
-
-      - name: Upload distributions
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-dists
-          path: dist/
-
-  pypi-publish:
-    runs-on: ubuntu-latest
-    needs:
-      - release-build
-    permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
-
-    # Dedicated environments with protections for publishing are strongly recommended.
-    # For more information, see: https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment#deployment-protection-rules
-    environment:
-      name: pypi
-      # OPTIONAL: uncomment and update to include your PyPI project URL in the deployment status:
-      # url: https://pypi.org/p/YOURPROJECT
-      #
-      # ALTERNATIVE: if your GitHub Release name is the PyPI project version string
-      # ALTERNATIVE: exactly, uncomment the following line instead:
-      # url: https://pypi.org/project/YOURPROJECT/${{ github.event.release.name }}
-
-    steps:
-      - name: Retrieve release distributions
-        uses: actions/download-artifact@v4
-        with:
-          name: release-dists
-          path: dist/
-
-      - name: Publish release distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
-
-  # Job to allow manual runs that execute stk_carbin.py and upload the produced PNG
+jobs:
   run-stk-carbin:
-    # Only run this job for manual workflow_dispatch runs (won't run on release events)
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -120,12 +59,10 @@ jobs:
           MARK: ${{ github.event.inputs.mark }}
         run: |
           set -euo pipefail
-          # Normalize inputs (use defaults from workflow_dispatch when empty)
           OUT=${OUT:-position_curve.png}
           K_IN=${K_IN:-5.0}
           MID_A=${MID_A:-0.33}
           MID_B=${MID_B:-0.66}
-          # Build CLI args
           ARGS=("--out" "$OUT" "--k" $K_IN)
           if [ -n "$MID_A" ] && [ -n "$MID_B" ]; then
             ARGS+=("--midband" $MID_A $MID_B)
