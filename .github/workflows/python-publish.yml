@@ -11,6 +11,29 @@ name: run to get risk
 on:
   release:
     types: [published]
+  # Allow manual runs from the Actions -> Run workflow button
+  workflow_dispatch:
+    inputs:
+      k:
+        description: 'Steepness parameter(s) (single or space-separated). Example: "5" or "0.5 1 2 5"'
+        required: false
+        default: '5.0'
+      midband_a:
+        description: 'Midband start (0..1 or 0..100)'
+        required: false
+        default: '0.33'
+      midband_b:
+        description: 'Midband end (0..1 or 0..100)'
+        required: false
+        default: '0.66'
+      mark:
+        description: 'Optional marker value (-100..100) to annotate on the chart (leave empty to skip)'
+        required: false
+        default: ''
+      out:
+        description: 'Output image filename'
+        required: false
+        default: 'position_curve.png'
 
 permissions:
   contents: read
@@ -68,3 +91,53 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+
+  # Job to allow manual runs that execute stk_carbin.py and upload the produced PNG
+  run-stk-carbin:
+    # Only run this job for manual workflow_dispatch runs (won't run on release events)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies (if any)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+
+      - name: Run stk_carbin.py (generate chart)
+        env:
+          OUT: ${{ github.event.inputs.out }}
+          K_IN: ${{ github.event.inputs.k }}
+          MID_A: ${{ github.event.inputs.midband_a }}
+          MID_B: ${{ github.event.inputs.midband_b }}
+          MARK: ${{ github.event.inputs.mark }}
+        run: |
+          set -euo pipefail
+          # Normalize inputs (use defaults from workflow_dispatch when empty)
+          OUT=${OUT:-position_curve.png}
+          K_IN=${K_IN:-5.0}
+          MID_A=${MID_A:-0.33}
+          MID_B=${MID_B:-0.66}
+          # Build CLI args
+          ARGS=("--out" "$OUT" "--k" $K_IN)
+          if [ -n "$MID_A" ] && [ -n "$MID_B" ]; then
+            ARGS+=("--midband" $MID_A $MID_B)
+          fi
+          if [ -n "$MARK" ]; then
+            ARGS+=("--mark" $MARK)
+          fi
+          echo "Running: python stk_carbin.py ${ARGS[*]}"
+          python stk_carbin.py "${ARGS[@]}"
+
+      - name: Upload generated chart
+        uses: actions/upload-artifact@v4
+        with:
+          name: position-chart
+          path: ${{ github.event.inputs.out }}
