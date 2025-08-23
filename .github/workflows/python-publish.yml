@@ -43,10 +43,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          # enable automatic pip cache for faster installs
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies (if any)
         run: |
           python -m pip install --upgrade pip
+          # show cached files for debugging (will be empty on first run)
+          ls -la ~/.cache/pip || true
           if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
 
       - name: Run stk_carbin.py (generate chart)
