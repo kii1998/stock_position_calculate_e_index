@@ -55,12 +55,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install dependencies (if any)
+      - name: Restore wheelhouse cache
+        uses: actions/cache@v4
+        with:
+          path: ./.wheels
+          key: ${{ runner.os }}-wheels-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-wheels-
+
+      - name: Prepare wheelhouse and install dependencies
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          # show cached files for debugging (will be empty on first run)
           ls -la ~/.cache/pip || true
-          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          mkdir -p .wheels
+          if [ -f requirements.txt ]; then
+            if [ -z "$(ls -A .wheels || true)" ]; then
+              echo "Wheelhouse empty — downloading wheels into .wheels (this will be cached)"
+              python -m pip download -r requirements.txt -d ./.wheels --only-binary=:all: || true
+            else
+              echo "Using restored wheelhouse"
+            fi
+            # Install from wheelhouse to avoid network downloads
+            python -m pip install --no-index --find-links ./.wheels -r requirements.txt
+          else
+            echo "No requirements.txt, skipping dependency install"
+          fi
 
       - name: Run stk_carbin.py (generate chart)
         env:
