@@ -1,0 +1,6 @@
+# Minimal Python dependencies for stk_carbin.py
+# Installed/tested with Python 3.13+ (conda base in this workspace)
+# Adjust versions if needed for your environment.
+
+numpy>=1.26
+matplotlib>=3.8

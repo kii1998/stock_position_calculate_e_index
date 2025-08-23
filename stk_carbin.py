@@ -31,12 +31,34 @@ from __future__ import annotations
 import argparse
 import math
 import os
+import signal
 from typing import Iterable, List
 
 try:
 	import numpy as np
 except Exception:  # numpy may be missing; we'll fallback to pure python arrays
 	np = None  # type: ignore
+
+
+def timeout_input(prompt: str, timeout: int = 10, default_value: str = "") -> str:
+	"""Input with timeout. Returns default_value if timeout occurs."""
+	def timeout_handler(signum, frame):
+		raise TimeoutError()
+	
+	# Set up the signal handler
+	old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+	signal.alarm(timeout)
+	
+	try:
+		result = input(prompt)
+		signal.alarm(0)  # Cancel the alarm
+		return result
+	except (TimeoutError, KeyboardInterrupt):
+		signal.alarm(0)  # Cancel the alarm
+		print(f"\nTimeout! Using default value: {default_value}")
+		return default_value
+	finally:
+		signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
 
 
 def _pos_symmetric(t: float, k: float, band: tuple[float, float] | None = None) -> float:
@@ -320,7 +342,7 @@ def main() -> None:
 	mark_value: float | None = args.mark
 	if args.sample is None and mark_value is None:
 		try:
-			inp = input("Enter 2000macd value to mark (-100..100), or leave blank to skip: ").strip()
+			inp = timeout_input("Enter 2000macd value to mark (-100..100), or leave blank to skip: ", timeout=10, default_value="46").strip()
 			if inp:
 				mark_value = float(inp)
 		except Exception:
